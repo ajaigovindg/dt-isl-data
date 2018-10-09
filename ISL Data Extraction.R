@@ -425,7 +425,7 @@ match_details_tables <- apply(match_links, 1, function(x){extract_match_teams(x,
 names(match_details_tables) <- match_links[,1]
 
 match_report_tables = lapply(match_details_tables, function(x){x[[1]]})
-match_report = match_report_tables %>% rbindlist(fill = TRUE, idcol = "MatchID")
+match_report = match_report_tables %>% rbindlist(fill = TRUE, idcol = "MatchID") %>% apply(2, trimws) %>% as.data.frame()
 
 # Match Info (Match_Info.csv) --------------------------------------------------
 match_info_tables = lapply(match_details_tables, function(x){x[[2]]})
@@ -441,7 +441,7 @@ player_bio = player_bio_tables %>% setNames(seasons) %>% lapply(function(x) {
   select(
     season = "Season",
     player = "Player",
-    team = "Team",
+    Team_Name = "Team",
     dob = "born",
     height.cm = "Height",
     position = "Position"
@@ -451,7 +451,8 @@ player_bio = player_bio_tables %>% setNames(seasons) %>% lapply(function(x) {
   separate(col = "season", into = c("season", "playoffs"), sep = " ") %>% 
   mutate(playoffs = ifelse(is.na(playoffs),"N","Y")) %>%
   filter(!is.na(player)) %>%
-  mutate_all(funs(na_if(., "???")))
+  mutate_all(funs(na_if(., "???"))) %>% 
+  left_join(team_codes, by = "Team_Name")
 
 # Converting data columns using lubridate
 # strptime(), as.Date() not working in dplyr chained mutate()
@@ -529,12 +530,30 @@ tm_transfer$V9 = dmy(tm_transfer$V9)
 
 names(tm_transfer) = c("season","team", "player","dob", "age","nationality","current.club","height.cm","foot","joined","contract.start","contract.end","curr.market.value.EUR","prev.market.value.EUR")
 
+season_lookup = data.frame(seasons = c("S01","S02","S03","S04"), season = c("2014","2015","2016","2017/18"))
+
+unique_players = data.frame()
+for (s in unique(substring(match_report$MatchID, 1, 3))) {
+  for (team in unique(match_report$Team_Code)) {
+    unique_players = match_report %>% mutate(season = substring(MatchID, 1, 3)) %>% filter((Team_Code == team) &
+                                                                                             (season == s)) %>% select(Team_Code, seasons = "season", Jersey_No, player = Player) %>% distinct() %>% left_join(season_lookup, by = "seasons") %>% select(-c("seasons")) %>% bind_rows(unique_players)
+  }
+}
+
+player_bio = player_bio %>% left_join(unique_players, by = c("season", "Team_Code", "player"))
+
+nas = player_bio[is.na(player_bio$Jersey_No),]
+
 # Next Steps
 
 # Corrections -----------------------------
 # Player Bio:
 # Add place of birth from the player profile page
-# Correct season column
+# Add jersey_no from match_report ----Completed
+# Correct season column ----Completed
+
+# Match Report
+# Correct Goal_Time information
 
 # New Data ------------------------------------
 # Transfers Data from worldfootball.net - https://www.worldfootball.net/transfers/ind-indian-super-league-2014/
