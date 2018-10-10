@@ -22,16 +22,15 @@ library(lubridate)
 # Variable Definitions -----------------------------------------
 ### Set Working Directory to the folder with the R script
 WORKING_DIRECTORY = getwd()
-
 setwd(WORKING_DIRECTORY)
 
+# Creating all required variables and lookup tables -----------------------------------------
 source("Variables_and_Lookups.R")
 
 # Creating all required functions -----------------------------------------
 source("ISL_Functions.R")
 
 # Creating Match History (All_Matches.csv) --------------------------------------------------
-
 # Extract all html pages for Match History
 match_history_htmls <- lapply(match_seasons, function(x){get_html_table(x, subpage = MATCH_HISTORY, which = 2)})
 
@@ -289,6 +288,24 @@ teams_squads = teams_squads_tables %>% filter(!(position == "Manager"))
 teams_managers = teams_squads_tables %>% filter(position == "Manager") %>% select(-c(3,7))
 
 # Next Steps
+
+# Team Performance / Appearances -----------------------------
+appearances_htmls =  lapply(teams, function(t) {
+  lapply(match_seasons, function(s) {
+    read_html(paste(START_URL, APPEARANCE, gsub(" ", "-", t), s, sep = "/"))
+  }) %>% setNames(seasons)
+}) %>% setNames(teams)
+
+appearances_tables =  lapply(appearances_htmls, function(t) {
+  lapply(t, function(s) {
+    s %>% html_nodes(".box > .data > table.standard_tabelle") %>% .[[1]] %>% html_nodes("tr:not(:first-child)") %>% sapply(extract_table, info = 4) %>% t() %>% as.data.frame(stringsAsFactors = FALSE) %>% mutate_all(funs(trimws))
+  }) %>% setNames(seasons)
+}) %>% setNames(teams)
+
+appearances = appearances_tables %>% lapply(function(t) {
+  rbindlist(t, fill = TRUE, idcol = "season")
+}) %>% rbindlist(fill = TRUE, idcol = "Team_Name") %>% setNames(appearances_col_names) %>% mutate_all(funs(na_if(., "-")))
+
 
 # Corrections -----------------------------
 # Player Bio:
