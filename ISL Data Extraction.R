@@ -148,7 +148,7 @@ extract_match_teams <- function(x, subpage){
   names(Team1) = report_col_names
   names(Team2) = report_col_names
   
-  df <- rbind(Team1, Team2)
+  df <- rbind(Team1, Team2) %>% mutate_all(funs(trimws))
   
   #Extract information on player and time of goal scoring
   html_doc %>% 
@@ -158,7 +158,7 @@ extract_match_teams <- function(x, subpage){
     separate(col = X2, into = c("Player_Goal_Time", "Support"), extra = "merge", sep = "\\.") -> goals
   
   if(!is.na(goals$Support)){
-    goals <- select(goals, Player_Goal_Time) %>% separate(col = 1, into = c("Player", "Goal_Time"), sep = -3)
+    goals <- select(goals, Player_Goal_Time) %>% separate(col = 1, into = c("Player", "Goal_Time"), sep = -3)%>% mutate_all(funs(trimws))
     goals$Goal_Time <- sprintf("%s'", goals$Goal_Time)
     
     df <- df %>% left_join(goals, by = "Player") %>% list(match_info)
@@ -425,7 +425,7 @@ match_details_tables <- apply(match_links, 1, function(x){extract_match_teams(x,
 names(match_details_tables) <- match_links[,1]
 
 match_report_tables = lapply(match_details_tables, function(x){x[[1]]})
-match_report = match_report_tables %>% rbindlist(fill = TRUE, idcol = "MatchID") %>% apply(2, trimws) %>% as.data.frame()
+match_report = match_report_tables %>% rbindlist(fill = TRUE, idcol = "MatchID") %>% mutate_all(funs(trimws)) %>% as.data.frame() 
 
 # Match Info (Match_Info.csv) --------------------------------------------------
 match_info_tables = lapply(match_details_tables, function(x){x[[2]]})
@@ -579,11 +579,11 @@ teams_managers = teams_squads_tables %>% filter(position == "Manager") %>% selec
 # Corrections -----------------------------
 # Player Bio:
 # Add place of birth from the player profile page
-# Add jersey_no from match_report ----Completed
+# Add jersey_no from match_report ----Partial
 # Correct season column ----Completed
 
 # Match Report
-# Correct Goal_Time information
+# Correct Goal_Time information ----Completed
 
 # New Data ------------------------------------
 # Transfers Data from worldfootball.net - https://www.worldfootball.net/transfers/ind-indian-super-league-2014/
