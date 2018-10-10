@@ -25,47 +25,14 @@ WORKING_DIRECTORY = getwd()
 
 setwd(WORKING_DIRECTORY)
 
-### Folder where the Ouput Files will be stored
-OUTPUT_FOLDER = "Output"
-
-### Output Files
-MATCH_HISTORY = "all_matches"
-PLAYERS_LIST = "players_list"
-TEAMS = "teams"
-TEAMS_IN_SEASON = "players"
-MATCH_REPORTS = "report"
-TEAM_MANAGER_HISTORY = paste(TEAMS,"_manager_history.csv", sep = "")
-TEAM_PROFILE = paste(TEAMS,"_profile.csv", sep = "")
-MATCH_INFO = "match_info.csv"
-
-START_URL = 'http://www.worldfootball.net'
-
-### Creating the directory if not present.
-dir.create(OUTPUT_FOLDER, showWarnings = FALSE)
+source("Variables_and_Lookups.R")
 
 # Creating all required functions -----------------------------------------
 source("ISL_Functions.R")
 
 # Creating Match History (All_Matches.csv) --------------------------------------------------
-#List of all links
-match_seasons = c("ind-indian-super-league-2014"
-                  ,"ind-indian-super-league-2014-playoffs"
-                  ,"ind-indian-super-league-2015"
-                  ,"ind-indian-super-league-2015-playoffs"
-                  ,"ind-indian-super-league-2016"
-                  ,"ind-indian-super-league-2016-playoffs"
-                  ,"ind-indian-super-league-2017-2018"
-                  ,"ind-indian-super-league-2017-2018-playoffs")
-seasons <- c("2014","2014 playoffs","2015","2015 playoffs","2016","2016 playoffs","2017/2018","2017/2018 playoffs")
 
-match_history_col_names = c("Date","Time","Team1","vs","Team2","Result","V7","V8")
-
-team_codes <- data.frame(Team_Code = c("ATK","ATK","CHN","DEL","PUN","GOA","NEU","KER","MUM","BGL","JSD"),
-                         Team_Name = c("Atlético de Kolkata","ATK","Chennaiyin FC", "Delhi Dynamos FC", "FC Pune City", "FC Goa", "NorthEast United FC","Kerala Blasters", "Mumbai City FC", "Bengaluru FC", "Jamshedpur FC"),
-                         stringsAsFactors = FALSE)
-
-round_lookup <- read_csv("round_lookup.csv", col_names = TRUE, col_types = "ccc")
-
+# Extract all html pages for Match History
 match_history_htmls <- lapply(match_seasons, function(x){get_html_table(x, subpage = MATCH_HISTORY, which = 2)})
 
 #Pre Processing for Match History data
@@ -99,15 +66,14 @@ match_history_tables %>% separate(col = Season, into = c("Season","Playoff"),sep
 
 match_history[[8]] <- as.POSIXct(match_history[[8]], format="%d/%m/%Y %H:%M")
 match_history <- cSplit(indt = match_history, splitCols = c("HT", "FT", "ET", "PS"), sep = ":")
-names(match_history) <- c("Season", "Team1_Name", "Team2_Name", "Date_Time", "Round", "Playoffs", "PSO", "AET","Team1_Code", "Team2_Code", "HT_Team1_Goals", "HT_Team2_Goals", "FT_Team1_Goals", "FT_Team2_Goals", "ET_Team1_Goals", "ET_Team2_Goals", "PS_Team1_Goals", "PS_Team2_Goals")
+names(match_history) <- mh_col_names
 match_history <- data.table(match_history)
 match_history[,MatchID := paste("S", str_pad(.GRP, width=2, side="left", pad="0"), "M", str_pad(seq_len(.N), width=3, side="left", pad="0"), sep = ""), by = Season]
 
 match_history = match_history[,c(1,19,5,6,4,7,8,9,2,11,13,15,17,10,3,12,14,16,18)]
 
 # Teams in each Season (Season_Teams.csv) --------------------------------------------------
-season_teams_col_names <- c("Team_Logo", "Team_Name", "Country", "Profile", "Matches", "Squad", "Appearances", "Official Homepage")
-
+# Extract all html pages for Teams in each season
 season_teams_htmls <- lapply(match_seasons, function(x){get_html_table(x, subpage = TEAMS_IN_SEASON, which = 2)})
 
 #Pre-processing for Teams in each season data
@@ -128,20 +94,17 @@ League %>%
   left_join(team_codes, by = "Team_Name") -> season_teams
 
 # Team Manager History (Teams_Manager_History.csv) ----------------------------------------------------
-teams <- c("Bengaluru FC", "Chennaiyin FC", "FC Goa", "FC Pune City", "Jamshedpur FC", "Kerala Blasters", "Mumbai City FC", "Delhi Dynamos FC", "ATK", "NorthEast United FC")
-team_manager_history_col_names = c("Period", "Manager", "Country", "Born")
-
+# Extract all html pages for Team Manager History
 team_manager_html <- lapply(paste(START_URL, TEAMS, paste(gsub(" ","-",tolower(teams)),"/9/",sep=""),sep="/"), function(x){read_html(x)})
 
-team_manager_history_tables = lapply(team_manager_html, function(x) {
+# Extract the table information from the html pages
+team_manager_history_tables = team_manager_html %>% lapply(function(x) {
   x %>% html_nodes("div.data > table.standard_tabelle") %>% .[[1]] %>% html_nodes("tr:not(:first-child)") %>% sapply(extract_table, info = 2) %>% t()%>% as.data.frame(stringsAsFactors = FALSE)
-})
-
-team_manager_history_tables = setNames(team_manager_history_tables, teams)
+}) %>% setNames(teams)
 
 team_manager_history = team_manager_history_tables %>% rbindlist(fill = TRUE, idcol = "team") %>% separate(col = "V1", into = c("period.start","period.end"), sep = " - ")
 
-colnames(team_manager_history) = c("team","period.start","period.end", "name","profile.link","country","dob")
+colnames(team_manager_history) = tmh_col_names
 
 team_manager_profile_links = team_manager_history[,c(1,5)]
 team_manager_history = team_manager_history[,-5]
@@ -150,8 +113,7 @@ team_manager_history$period.start = dmy(team_manager_history$period.start)
 team_manager_history$period.end = dmy(team_manager_history$period.end)
 
 # Team Profile (Teams_Profile.csv) ----------------------------------------------------
-teams_profile_col_names = c("Column_Names", "Values")
-
+# Extract all the htmls for team profiles
 teams_profile_htmls <- lapply(paste(gsub(" ","-",tolower(teams)),"/1/",sep=""), function(x){get_html_table(x, subpage = TEAMS, which = 1)})
 
 #Pre-processing for Team Profile data
@@ -217,17 +179,13 @@ player_bio = player_bio_tables %>% setNames(seasons) %>% lapply(function(x) {
 player_bio_tables$dob = dmy(player_bio_tables$dob)
 
 # Extracting Transfer/Market values from transfermarkt (All_Transfers.csv) ---------------------------------
-
-# Variable definitions
-tm_codes <- c("41030", "45299", "45080", "45321", "45275", "60816", "45277", "45274", "45276")
-tm_teams <- c("Bengaluru FC", "Chennaiyin FC", "Delhi Dynamos FC", "FC Goa", "FC Pune City", "Jamshedpur FC","Kerala Blasters FC","Mumbai City FC","NorthEast United FC")
-tm_df <- data.frame(team_codes = tm_codes, team_names = tm_teams)
-season_years <- c("2013","2014","2015","2016","2017","2018")
-tm_START_URL = "https://www.transfermarkt.com"
-
+# Generating all the webpage links
 tm_links <- sapply(season_years, function(y){apply(tm_df, 1, function(x){paste(tm_START_URL,gsub(" ","-",tolower(x[2])),"kader/verein",x[1],"saison_id", y, "plus/1",sep="/")})})
+
+# Extract all the htmls from the links above
 html_doc = apply(tm_links, 2, function(x){lapply(x, function(y){read_html(y)})})
 
+# Generate a list of lists with required table information from the htmls
 tm_transfer_tables <-
   lapply(html_doc, function(years) {
     lapply(years, function(htmls) {
@@ -241,6 +199,7 @@ tm_transfer_tables[["2018"]] = lapply(tm_transfer_tables[["2018"]], function(x) 
            c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11"))
 })
 
+# Post processing and combining all information into 1 table
 tm_transfer = tm_transfer_tables %>% lapply(function(years) {
   setNames(years, tm_teams)
 }) %>%
@@ -286,9 +245,7 @@ tm_transfer$DOB = mdy(tm_transfer$DOB)
 tm_transfer$V7 = mdy(tm_transfer$V7)
 tm_transfer$V9 = dmy(tm_transfer$V9)
 
-names(tm_transfer) = c("season","team", "player","dob", "age","nationality","current.club","height.cm","foot","joined","contract.start","contract.end","curr.market.value.EUR","prev.market.value.EUR")
-
-season_lookup = data.frame(seasons = c("S01","S02","S03","S04"), season = c("2014","2015","2016","2017/18"))
+names(tm_transfer) = tm_trans_col_names
 
 unique_players = data.frame()
 for (s in unique(substring(match_report$MatchID, 1, 3))) {
@@ -309,9 +266,8 @@ teams_players_atoz_tables = teams_players_atoz_htmls %>% lapply(function(x){html
 
 teams_players_atoz = rbindlist(teams_players_atoz_tables, fill = TRUE, idcol = "Team_Name")
 
-# Team Squads
-yrs = 2014:2020
-
+# Team Squads ---------------------------------
+# Extract all htmls for team squads
 teams_squads_htmls <-
   lapply(gsub(" ", "-", tolower(teams)), function(x) {
     lapply(yrs, function(y) {
@@ -322,8 +278,8 @@ teams_squads_htmls <-
 teams_squads_tables <-
   lapply(teams_squads_htmls, function(t) {
     lapply(t, function(y) {
-      y %>% html_nodes("div.data > table.standard_tabelle") %>% .[[1]] %>% html_table(fill=TRUE, header = FALSE) %>% setNames(c("ignore1","jersey_no","player","ignore2","country","dob","position"))
-    }) %>% setNames(c("2013/14","2014/15","2015/16","2016/17","2017/18","2018/19","2019/20")) %>% rbindlist(idcol = "season", fill = TRUE)
+      y %>% html_nodes("div.data > table.standard_tabelle") %>% .[[1]] %>% html_table(fill=TRUE, header = FALSE) %>% setNames(ts_col_names)
+    }) %>% setNames(ts_seasons) %>% rbindlist(idcol = "season", fill = TRUE)
   }) %>% rbindlist(idcol = "Team_Name", fill = TRUE) %>% 
   do(setDT(.)[,position := na.locf(na.locf(position, na.rm=FALSE), fromLast=TRUE)]) %>% 
   mutate_all(funs(na_if(., ""))) %>% 
