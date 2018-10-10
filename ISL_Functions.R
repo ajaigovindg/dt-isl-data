@@ -265,6 +265,8 @@ extract_table <- function(tr, info) {
     } else{
       list(html_text(scope[1]))
     }
+  } else if (info == 4) {
+    tr %>% html_children() %>% html_text()
   }
 }
 
@@ -296,9 +298,9 @@ match_report_post_process = function(l) {
 }
 
 # Archived functions --------------------------------------------------
-# getHrefs <- function(node, encoding) {  
-#   x <- xmlChildren(node)$a 
-#   if (!is.null(x)) paste0("http://", parseURI(url)$server, xmlGetAttr(x, "href"), " | ", xmlValue(x) ) else xmlValue(xmlChildren(node)$text) 
+# getHrefs <- function(node, encoding) {
+#   x <- xmlChildren(node)$a
+#   if (!is.null(x)) paste0("http://", parseURI(url)$server, xmlGetAttr(x, "href"), " | ", xmlValue(x) ) else xmlValue(xmlChildren(node)$text)
 # }
 
 # extract_tr <- function(tr){
@@ -310,7 +312,7 @@ match_report_post_process = function(l) {
 #     scope[length(scope)] %>% html_text(),
 #     scope[length(scope)] %>% html_node("span") %>% html_attr("title"))
 # }
-# 
+#
 # extract_team_manager_history = function(tr){
 #   scope <- tr %>% html_children()
 #   c(scope[1] %>% html_text(),
