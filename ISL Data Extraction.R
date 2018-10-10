@@ -544,6 +544,36 @@ player_bio = player_bio %>% left_join(unique_players, by = c("season", "Team_Cod
 
 nas = player_bio[is.na(player_bio$Jersey_No),]
 
+# Team Players A to Z (will be used to map country, position and dob to player bio) ---------------------------------
+teams_players_atoz_htmls <- lapply(paste(gsub(" ","-",tolower(teams)),"/10/",sep=""), function(x){read_html(paste(START_URL,TEAMS, x, sep = "/"))})
+
+teams_players_atoz_tables = teams_players_atoz_htmls %>% lapply(function(x){html_nodes(x, "div.data > table") %>% .[[1]] %>% html_table() %>% setNames(c("player", "ignore", "country", "position", "dob")) %>% select(c(-2)) %>% filter(nchar(position) != 1)}) %>% setNames(teams)
+
+teams_players_atoz = rbindlist(teams_players_atoz_tables, fill = TRUE, idcol = "Team_Name")
+
+# Team Squads
+yrs = 2014:2020
+
+teams_squads_htmls <-
+  lapply(gsub(" ", "-", tolower(teams)), function(x) {
+    lapply(yrs, function(y) {
+      read_html(paste(START_URL, TEAMS, x, y, "2", sep = "/"))
+    })
+  }) %>% setNames(teams)
+
+teams_squads_tables <-
+  lapply(teams_squads_htmls, function(t) {
+    lapply(t, function(y) {
+      y %>% html_nodes("div.data > table.standard_tabelle") %>% .[[1]] %>% html_table(fill=TRUE, header = FALSE) %>% setNames(c("ignore1","jersey_no","player","ignore2","country","dob","position"))
+    }) %>% setNames(c("2013/14","2014/15","2015/16","2016/17","2017/18","2018/19","2019/20")) %>% rbindlist(idcol = "season", fill = TRUE)
+  }) %>% rbindlist(idcol = "Team_Name", fill = TRUE) %>% 
+  do(setDT(.)[,position := na.locf(na.locf(position, na.rm=FALSE), fromLast=TRUE)]) %>% 
+  mutate_all(funs(na_if(., ""))) %>% 
+  filter(is.na(ignore1)) %>% select(-c(3,6))
+
+teams_squads = teams_squads_tables %>% filter(!(position == "Manager"))
+teams_managers = teams_squads_tables %>% filter(position == "Manager") %>% select(-c(3,7))
+
 # Next Steps
 
 # Corrections -----------------------------
