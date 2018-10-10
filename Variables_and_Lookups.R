@@ -13,6 +13,7 @@ MATCH_REPORTS = "report"
 TEAM_MANAGER_HISTORY = paste(TEAMS,"_manager_history.csv", sep = "")
 TEAM_PROFILE = paste(TEAMS,"_profile.csv", sep = "")
 MATCH_INFO = "match_info.csv"
+APPEARANCE = "team_performance"
 
 START_URL = 'http://www.worldfootball.net'
 
@@ -67,3 +68,6 @@ yrs = 2014:2020
 
 ts_seasons = c("2013/14","2014/15","2015/16","2016/17","2017/18","2018/19","2019/20")
 ts_col_names = c("ignore1","jersey_no","player","ignore2","country","dob","position")
+
+# Team Performance / Appearances -----------------------------
+appearances_col_names = c("Team_Name", "season","Name","mins.played","appearances","starting.11","substitutions","replacements","goals","yellow.cards","second.yellow.cards","red.cards")
